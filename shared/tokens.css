@@ -1,0 +1,28 @@
+/* NVA lo-fi design system — tokens. Source of truth: skills/nva-lofi-design-system */
+:root {
+  --bg: #FFFFFF;
+  --surface: #F3F4F6;
+  --border: #D1D5DB;
+  --fg: #111827;
+  --muted: #6B7280;
+  --accent: #2563EB;
+  --accent-fg: #FFFFFF;
+  --success: #16A34A;
+  --warning: #D97706;
+  --error: #DC2626;
+
+  --font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --t-title: 600 28px/34px var(--font);
+  --t-heading: 600 20px/28px var(--font);
+  --t-body: 400 16px/24px var(--font);
+  --t-secondary: 400 14px/20px var(--font);
+  --t-caption: 400 12px/16px var(--font);
+
+  --s1: 4px; --s2: 8px; --s3: 16px; --s4: 24px; --s5: 32px;
+  --radius: 8px;
+  --control-h: 48px;
+
+  --canvas-w: 390px;
+  --canvas-h: 844px;
+  color-scheme: light;
+}

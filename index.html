@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVA Prototypes</title>
+<link rel="stylesheet" href="shared/tokens.css">
+<link rel="stylesheet" href="shared/components.css">
+<style>
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: var(--t-body); }
+  body { padding: 32px max(16px, env(safe-area-inset-left, 0px)) 64px max(16px, env(safe-area-inset-right, 0px)); }
+  main { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+  .stage-h { font: var(--t-caption); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+  a.flow { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); color: inherit; text-decoration: none; }
+  a.flow:last-child { border-bottom: 0; }
+  a.flow .n { flex: 1; min-width: 0; }
+  a.flow .chev { color: var(--muted); }
+  .todo { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <div><h1>NVA Prototypes</h1><p class="muted">Low-fidelity flows, one per feature bucket. Mobile only, 390×844.</p></div>
+
+  <section><div class="stage-h">Adoption</div>
+    <div class="flow todo">Pet Fit Quiz · Smart Pet Match · Tailored Supplies List — not started</div></section>
+
+  <section><div class="stage-h">First Visit & Ramping Up</div>
+    <div class="flow todo">Care-Led Booking · First Visit Prep & Lifelong Care Guide · Household Profile — not started</div></section>
+
+  <section><div class="stage-h">Ongoing Care</div>
+    <div class="flow todo">Portable Care Record · Financial Concierge · Continuum of Care Hub — not started</div></section>
+
+  <section><div class="stage-h">Spec/ER</div>
+    <a class="flow" href="flows/spec-er/01-ai-triage/"><span class="n"><b>24/7 Spec/ER Access with AI Triage</b><div class="secondary muted">v1 · 9 screens · reviewed 6 Nov 2026</div></span><span class="chip success">v1</span><span class="chev">›</span></a>
+    <div class="flow todo">Spec/ER/Surgery Status Tracking · Ready Set Recover — not started</div></section>
+
+  <section><div class="stage-h">Aging & End of Life</div>
+    <div class="flow todo">Compassionate Euthanasia Pricing · Pet Passing Workflow · Grief Support — not started</div></section>
+
+  <p class="caption">Data is fictional (see shared/fixtures.js). Clinical copy is a placeholder tagged [vet-approved content].</p>
+</main>
+</body>
+</html>
