@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NVA · 24/7 Spec/ER Access with AI Triage</title>
+<link rel="stylesheet" href="../../../shared/tokens.css">
+<link rel="stylesheet" href="../../../shared/components.css">
+<style>
+  /* Reviewer chrome around the phone. Not part of the design system. */
+  html, body { margin: 0; background: #E5E7EB; color: var(--fg); font: var(--t-body); }
+  body { min-height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px max(16px, env(safe-area-inset-left, 0px)) 96px max(16px, env(safe-area-inset-right, 0px)); }
+  .meta { width: min(100%, 720px); display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font: var(--t-secondary); color: var(--muted); flex-wrap: wrap; }
+  .meta b { color: var(--fg); font-weight: 600; }
+  .stage { width: 100%; display: flex; justify-content: center; }
+  .frame-wrap { display: none; flex-direction: column; align-items: center; gap: 8px; }
+  .frame-wrap.active { display: flex; }
+  .frame-wrap .fname { font: var(--t-caption); color: var(--muted); }
+  @media (max-width: 420px) { .phone, .frame { width: 100%; } .phone { height: auto; min-height: 700px; } }
+  nav.reviewer { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg); border-top: 1px solid var(--border); padding: 8px max(16px, env(safe-area-inset-left, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-right, 0px)); display: flex; align-items: center; gap: 8px; justify-content: center; }
+  nav.reviewer select { height: 40px; border-radius: 8px; border: 1px solid var(--border); font: var(--t-secondary); padding: 0 8px; max-width: 60vw; background: var(--bg); color: var(--fg); }
+  nav.reviewer button { height: 40px; min-width: 64px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); font: var(--t-secondary); cursor: pointer; color: var(--fg); }
+  .toast { position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 8px 16px; border-radius: 8px; font: var(--t-secondary); opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .btn:focus-visible, .pill:focus-visible, .link:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+  .big { font: 600 28px/34px var(--font); }
+  .get-help { height: 64px; font-size: 20px; }
+</style>
+</head>
+<body>
+<div class="meta">
+  <span><b>spec-er-01-ai-triage</b> · v1 · lo-fi · 390×844</span>
+  <span id="pos">Screen 1 of 9</span>
+</div>
+
+<div class="stage" id="stage"></div>
+
+<nav class="reviewer" aria-label="Reviewer navigation">
+  <button id="prev" type="button">Back</button>
+  <select id="jump" aria-label="Jump to screen"></select>
+  <button id="next" type="button">Next</button>
+</nav>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="../../../shared/fixtures.js"></script>
+<script>
+(function () {
+  const F = window.NVA;
+  const W = F.pets.waffles, L = F.household, ER = F.clinics.erAway, S = F.scenario;
+  const WP = W.name.endsWith('s') ? W.name + "'" : W.name + "'s";
+  const memberPrice = n => Math.round(n * (1 - L.membership.discount));
+  const go = id => { location.hash = id; };
+  const notInScope = () => toast("Not in scope for this flow");
+
+  // Screen definitions. Each returns HTML for inside the phone (or a channel frame).
+  const screens = [
+    { id: "cover", name: "Cover card", kind: "frame", html: () => `
+      <div class="kicker">Cover card · not interactive</div>
+      <h2>24/7 Spec/ER Access with AI Triage</h2>
+      <div class="cover"><dl>
+        <dt>Stage</dt><dd>Spec/ER</dd>
+        <dt>Situation</dt><dd>Something is wrong with ${W.name} late at night, away from home. ${L.name.split(" ")[0]} doesn't know whether it's an emergency or where to go, and doesn't want to explain his history several times over while anxious.</dd>
+        <dt>NVA reaction</dt><dd>Chat-first guided questions, a vet one tap away, a held arrival time at the nearest NVA Spec/ER, and records sent ahead so she only has to get him there.</dd>
+        <dt>Access points</dt><dd>App (chat, confirmation), SMS, offline fallback. Back end: handoff to nearest Spec/ER with records.</dd>
+        <dt>1.0 → 2.0</dt><dd>1.0: Teletriage, Emergency Queue, Virtual Check-In. 2.0: chat-first questions, arrival held, records sent ahead.</dd>
+        <dt>Priority / size</dt><dd>Prototype: Y · Large</dd>
+        <dt>Open questions</dt><dd>How much can the agent say before a vet is involved? What does "records sent" mean when the ER's PIMS isn't linked? (Lyle, 10/27: agent should offer more and route by answers.)</dd>
+        <dt>Also appears in</dt><dd>Spec/ER/Surgery Status Tracking (next), Financial Concierge (estimate), Portable Care Record (records sent).</dd>
+      </dl></div>` },
+
+    { id: "home", name: "Home · entry", kind: "phone", html: () => `
+      <div class="topbar"><span class="title">Hi ${L.name.split(" ")[0]}</span><button class="action" type="button" data-nope>Account</button></div>
+      <div class="card">
+        <div class="row" style="border:0;padding:0;min-height:0"><div class="ph-image" style="width:56px;aspect-ratio:1;flex-shrink:0"></div>
+          <div class="label"><b>${W.name}</b><div class="secondary muted">${W.breed} · 2 yrs · ${W.weightKg} kg</div></div></div>
+        <div class="secondary">Next: ${W.nextVisit}</div>
+      </div>
+      <button class="btn btn-primary get-help" type="button" data-go="chat">Get help now</button>
+      <div class="caption">Any hour. Chat with NVA, or talk to a vet.</div>
+      <div class="card outlined">
+        <div class="row"><span class="label">Book a visit</span><span class="chev">›</span></div>
+        <div class="row"><span class="label">${WP} care record</span><span class="chev">›</span></div>
+        <div class="row"><span class="label">Rewards · Level 2</span><span class="chev">›</span></div>
+      </div>
+      <div class="caption">${S.now} · ${S.where}</div>` },
+
+    { id: "chat", name: "Chat · greeting", kind: "phone", html: () => `
+      ${hitl()}
+      <div class="topbar"><button class="back" type="button" data-go="home">‹</button><span class="title">NVA Care</span></div>
+      <div class="chat">
+        <div class="bubble agent">Hi Lucy, I'm NVA's care assistant. I'm not a vet, but I can get you to one. What's going on with ${W.name}?</div>
+      </div>
+      <div class="pills">
+        <button class="pill" type="button" data-go="symptom">Something's wrong</button>
+        <button class="pill" type="button" data-nope>Question about his meds</button>
+        <button class="pill" type="button" data-nope>Book a visit</button>
+      </div>
+      <input class="input" id="chat-input-1" placeholder="Or type anything" aria-label="Message">` },
+
+    { id: "symptom", name: "Chat · guided questions", kind: "phone", html: () => `
+      ${hitl()}
+      <div class="topbar"><button class="back" type="button" data-go="chat">‹</button><span class="title">NVA Care</span></div>
+      <div class="chat">
+        <div class="bubble user">Something's wrong</div>
+        <div class="bubble agent">Okay. One question at a time. What are you noticing?</div>
+        <div class="bubble user">${S.symptom}</div>
+        <div class="bubble agent">Is ${W.name} alert and breathing normally?</div>
+        <div class="bubble user">Yes, but he's restless</div>
+        <div class="bubble agent">When did it start?</div>
+      </div>
+      <div class="pills">
+        <button class="pill" type="button" data-go="recommend">In the last hour</button>
+        <button class="pill" type="button" data-go="recommend">Earlier today</button>
+        <button class="pill" type="button" data-go="recommend">A few days</button>
+      </div>
+      <input class="input" id="chat-input-2" placeholder="Or type anything" aria-label="Message">` },
+
+    { id: "recommend", name: "Recommendation · nearest ER", kind: "phone", html: () => `
+      ${hitl()}
+      <div class="topbar"><button class="back" type="button" data-go="symptom">‹</button><span class="title">NVA Care</span></div>
+      <div class="chat">
+        <div class="bubble user">In the last hour</div>
+        <div class="bubble agent">This should be seen tonight. <span class="caption">[vet-approved content]</span></div>
+        <div class="bubble agent">The nearest NVA emergency clinic to you is open now. I can hold an arrival time and send ${WP} records ahead so you don't have to explain anything.</div>
+      </div>
+      <div class="card outlined">
+        <b>${ER.name}</b>
+        <div class="secondary muted">${ER.distance} · ${ER.hours} · ${ER.address}</div>
+        <div class="secondary">Arrival time available: <b>${S.arrivalHeld}</b></div>
+        <div class="secondary">ER triage fee <span class="strike">$${F.prices.erTriage}</span> <b>$${memberPrice(F.prices.erTriage)}</b> <span class="caption">Plus member</span></div>
+      </div>
+      <button class="btn btn-primary" type="button" data-go="confirm">Hold ${S.arrivalHeld} and send records</button>
+      <div class="btn-row"><button class="btn btn-secondary" type="button" data-nope>Call the ER</button><button class="btn btn-secondary" type="button" data-nope>Other clinics</button></div>` },
+
+    { id: "confirm", name: "Confirmation · records sent", kind: "phone", html: () => `
+      <div class="topbar"><span class="title">You're set</span></div>
+      <p class="big">Arrival held for ${S.arrivalHeld}</p>
+      <div class="ph-map"><span class="pin" style="left:48%;top:40%"></span>Map · ${ER.distance}</div>
+      <div class="card">
+        <b>${ER.name}</b>
+        <div class="secondary muted">${ER.address}</div>
+        <div class="secondary">${ER.phone}</div>
+      </div>
+      <div class="card outlined">
+        <div class="row"><span class="label">${WP} records sent to the clinic</span><span class="chip success">Sent</span></div>
+        <div class="row"><span class="label">Clinic confirmed arrival</span><span class="chip warning">Waiting</span></div>
+        <div class="caption">We've sent ${WP} records to the clinic. You'll get a text when they confirm.</div>
+      </div>
+      <div class="secondary">Estimate for tonight: $${memberPrice(F.prices.erTriage)} triage, then <b>$${F.prices.overnight[0]}–$${F.prices.overnight[1]}</b> if he stays overnight. <button class="link" type="button" data-nope>See ways to pay</button></div>
+      <button class="btn btn-primary" type="button" data-nope>Open directions</button>
+      <button class="btn btn-secondary" type="button" data-nope>Talk to a vet on the way</button>` },
+
+    { id: "sms", name: "SMS · confirmation", kind: "frame", html: () => `
+      <div class="kicker">SMS · sent on confirmation</div>
+      <div class="sms"><div class="caption">NVA · 11:49 PM</div>NVA: ${WP} arrival at ${ER.name} is held for ${S.arrivalHeld}. Records sent. Directions: nva.co/d/8k2. Reply VET to talk to a vet.</div>
+      <div class="caption">Channel: SMS. Also pushed to app. 154 characters.</div>` },
+
+    { id: "offline", name: "Fallback · no connectivity", kind: "phone", html: () => `
+      <div class="banner warning">You're offline. Showing what we saved before you lost signal.</div>
+      <div class="topbar"><span class="title">Your plan for tonight</span></div>
+      <div class="card">
+        <b>${ER.name}</b>
+        <div class="secondary muted">${ER.address}</div>
+        <div class="secondary">Arrival held for <b>${S.arrivalHeld}</b> · records sent</div>
+      </div>
+      <button class="btn btn-primary" type="button" data-nope>Call ${ER.phone}</button>
+      <div class="card outlined">
+        <div class="row"><span class="label">${WP} record (saved copy)</span><span class="chev">›</span></div>
+        <div class="row"><span class="label">Show QR to the clinic</span><span class="chev">›</span></div>
+      </div>
+      <div class="caption">Chat and live updates will resume when you're back online. Toggle: connectivity = off.</div>` },
+
+    { id: "exit", name: "Exit · what changed", kind: "phone", html: () => `
+      <div class="topbar"><span class="title">${WP} record</span></div>
+      <div class="card outlined">
+        <div class="row"><span class="label">ER visit in progress</span><span class="chip success">Live</span></div>
+        <div class="caption">Continues in: Spec/ER/Surgery Status Tracking</div>
+      </div>
+      <div class="tl">
+        <div class="tl-row"><div class="tl-icon">ER</div><div class="tl-body"><div class="caption">18 Oct 2026 · 11:49 PM</div>ER visit started at ${ER.name}. Records sent ahead. Reason: ${S.symptom.toLowerCase()}.</div></div>
+        ${W.timeline.map(t => `<div class="tl-row"><div class="tl-icon">${t.icon}</div><div class="tl-body"><div class="caption">${t.date}</div>${t.text}</div></div>`).join("")}
+      </div>
+      <div class="card"><b>What changed</b><div class="secondary">New timeline entry · arrival held at the ER · records shared with ${ER.name} · a Financial Concierge estimate attached.</div></div>` },
+  ];
+
+  function hitl() {
+    return `<div class="hitl"><button class="btn btn-secondary" type="button" data-nope>Talk to a vet now</button></div>`;
+  }
+
+  // Render
+  const stage = document.getElementById("stage");
+  const jump = document.getElementById("jump");
+  screens.forEach((s, i) => {
+    const wrap = document.createElement("div");
+    wrap.className = "frame-wrap"; wrap.id = "wrap-" + s.id;
+    const name = `<div class="fname">${String(i).padStart(2, "0")} · ${s.name}</div>`;
+    if (s.kind === "phone") {
+      wrap.innerHTML = `${name}<div class="phone"><div class="statusbar"><span>11:4${i} PM</span><i></i></div><div class="screen">${s.html()}</div><div class="homebar"><i></i></div></div>`;
+    } else {
+      wrap.innerHTML = `${name}<div class="frame">${s.html()}</div>`;
+    }
+    stage.appendChild(wrap);
+    const o = document.createElement("option"); o.value = s.id; o.textContent = `${String(i).padStart(2, "0")} · ${s.name}`; jump.appendChild(o);
+  });
+
+  let idx = 0;
+  function show(id) {
+    const i = Math.max(0, screens.findIndex(s => s.id === id));
+    idx = i;
+    document.querySelectorAll(".frame-wrap").forEach(w => w.classList.remove("active"));
+    document.getElementById("wrap-" + screens[i].id).classList.add("active");
+    document.getElementById("pos").textContent = `Screen ${i + 1} of ${screens.length}`;
+    jump.value = screens[i].id;
+    window.scrollTo({ top: 0 });
+  }
+  document.getElementById("prev").addEventListener("click", () => go(screens[Math.max(0, idx - 1)].id));
+  document.getElementById("next").addEventListener("click", () => go(screens[Math.min(screens.length - 1, idx + 1)].id));
+  jump.addEventListener("change", e => go(e.target.value));
+  stage.addEventListener("click", e => {
+    const t = e.target.closest("[data-go],[data-nope],.row");
+    if (!t) return;
+    if (t.dataset.go) go(t.dataset.go);
+    else notInScope();
+  });
+  window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+  show(location.hash.slice(1) || screens[0].id);
+
+  let tt;
+  function toast(msg) { const el = document.getElementById("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => el.classList.remove("show"), 1400); }
+})();
+</script>
+</body>
+</html>
